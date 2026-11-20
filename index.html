@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Atomic Explorer</title>
+<meta name="description" content="Interactive atomic-structure simulator for NYS Regents Chemistry: protons, neutrons, electrons, the periodic table, isotopes, and Regents-style practice." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===================== Design tokens ===================== */
+:root{
+  /* default theme is DARK — this app commits to the "instrument console"
+     look the brief asked for; light is an accessibility override, not the
+     primary design. */
+  --bg:#0D1420;
+  --surface:#141C2B;
+  --surface-sunken:#0A0F18;
+  --ink:#ECEFF5;
+  --ink-muted:#92A0B5;
+  --ink-faint:#5C6880;
+  --border:#263347;
+  --accent:#F2B84B;
+  --accent-ink:#1A1300;
+  --accent-soft:#3A2E12;
+
+  --c-proton:#F0564A;
+  --c-neutron:#AEB7C4;
+  --c-electron:#3FA9F5;
+  --c-proton-soft:#3A1915;
+  --c-neutron-soft:#272C33;
+  --c-electron-soft:#102A3D;
+
+  --good:#3BC27B;
+  --good-soft:#123323;
+  --warn:#E2A33D;
+  --warn-soft:#352711;
+  --critical:#E2605A;
+  --critical-soft:#3A1A18;
+
+  --font-display:"Orbitron", "Arial Narrow", sans-serif;
+  --font-body:"Work Sans", system-ui, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+:root[data-theme="light"]{
+  --bg:#F2F4F9;
+  --surface:#FFFFFF;
+  --surface-sunken:#E7EAF2;
+  --ink:#171E2B;
+  --ink-muted:#525E72;
+  --ink-faint:#8995A8;
+  --border:#D6DCE8;
+  --accent:#B9790A;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#FBEBCE;
+
+  --c-proton:#C9372C;
+  --c-neutron:#5B6676;
+  --c-electron:#1C6FD1;
+  --c-proton-soft:#FBE2DF;
+  --c-neutron-soft:#E6E9EE;
+  --c-electron-soft:#DDEBFB;
+
+  --good:#1E8E5A;
+  --good-soft:#E1F3EA;
+  --warn:#AD6A00;
+  --warn-soft:#FCF0D8;
+  --critical:#C23B3B;
+  --critical-soft:#FBE6E6;
+  color-scheme: light;
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ font-size: var(--text-scale, 100%); }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:15px;
+  line-height:1.55;
+}
+h1,h2,h3,h4{ font-family:var(--font-display); text-wrap:balance; margin:0 0 .5em; letter-spacing:.02em; text-transform:uppercase; }
+h2{ font-size:1.4rem; } h3{ font-size:.92rem; letter-spacing:.08em; }
+p{ margin:0 0 .75em; }
+.mono{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.visually-hidden{ position:absolute; width:1px;height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+a{ color:var(--accent); }
+button, input, select, textarea{ font-family:inherit; font-size:inherit; color:inherit; }
+:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; border-radius:4px; }
+
+/* ===================== Shell ===================== */
+.app-header{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:14px 20px;
+  display:flex; align-items:center; gap:14px;
+  position:sticky; top:0; z-index:30;
+}
+.brand-mark{ width:42px; height:42px; flex:none; }
+.app-header h1{ font-size:1.3rem; margin:0; color:var(--ink); }
+.app-header .subtitle{ color:var(--ink-muted); font-size:.8rem; margin:0; text-transform:none; letter-spacing:0; font-family:var(--font-body); }
+.header-text{ flex:1; min-width:0; }
+.header-controls{ display:flex; gap:8px; align-items:center; }
+
+.icon-btn{
+  border:1px solid var(--border); background:var(--surface-sunken); color:var(--ink);
+  border-radius:8px; padding:7px 10px; cursor:pointer; font-size:.78rem; font-weight:600;
+}
+.icon-btn:hover{ filter:brightness(1.15); }
+
+nav.tabs{
+  display:flex; gap:4px; overflow-x:auto; padding:8px 14px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+  position:sticky; top:70px; z-index:29;
+  scrollbar-width:thin;
+}
+nav.tabs button{
+  flex:none; border:1px solid transparent; background:transparent; color:var(--ink-muted);
+  padding:9px 14px; border-radius:9px 9px 0 0; cursor:pointer; font-weight:700; font-size:.76rem;
+  white-space:nowrap; border-bottom:3px solid transparent; font-family:var(--font-display); letter-spacing:.04em;
+}
+nav.tabs button:hover{ background:var(--surface-sunken); color:var(--ink); }
+nav.tabs button[aria-selected="true"]{ color:var(--accent); border-bottom:3px solid var(--accent); background:var(--accent-soft); }
+nav.tabs .tab-index{ font-family:var(--font-mono); font-size:.7rem; opacity:.7; margin-right:5px; }
+
+main{ max-width:1320px; margin:0 auto; padding:20px; }
+.tab-panel{ display:none; animation:fade .25s ease; }
+.tab-panel.active{ display:block; }
+@keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+@media (prefers-reduced-motion: reduce){ .tab-panel{ animation:none; } }
+
+.tab-intro{ margin-bottom:16px; }
+.tab-intro .standard-chip{
+  display:inline-block; font-family:var(--font-mono); font-size:.7rem; font-weight:600;
+  background:var(--accent-soft); color:var(--accent); border-radius:999px; padding:3px 10px; margin-bottom:8px;
+}
+.tab-intro p{ color:var(--ink-muted); font-size: .95rem;}
+
+.layout-grid{ display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
+@media (max-width: 920px){ .layout-grid{ grid-template-columns:1fr; } }
+
+.panel{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; }
+.panel + .panel{ margin-top:16px; }
+.panel h3{ color:var(--ink-muted); font-weight:700; margin-bottom:12px; }
+
+/* ===================== Particle legend / labels ===================== */
+.legend-row{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:10px; font-size:.82rem; }
+.legend-chip{ display:flex; align-items:center; gap:6px; }
+.legend-dot{ width:14px; height:14px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:8px; font-weight:800; color:#0b0b0b; font-family:var(--font-mono); }
+.legend-dot.proton{ background:var(--c-proton); }
+.legend-dot.neutron{ background:var(--c-neutron); }
+.legend-dot.electron{ background:var(--c-electron); }
+
+/* ===================== Buttons ===================== */
+.btn{
+  border:1px solid var(--border); background:var(--surface-sunken); color:var(--ink); border-radius:9px;
+  padding:9px 14px; font-weight:700; font-size:.8rem; cursor:pointer;
+}
+.btn:hover{ filter:brightness(1.2); }
+.btn.primary{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+.btn.primary:hover{ filter:brightness(1.08); }
+.btn:disabled{ opacity:.4; cursor:not-allowed; }
+.btn-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+
+.pill{ display:inline-flex; align-items:center; gap:4px; font-size:.68rem; font-weight:700; padding:2px 9px; border-radius:999px; font-family:var(--font-mono); }
+.pill.level{ background:var(--accent-soft); color:var(--accent); }
+.pill.good{ background:var(--good-soft); color:var(--good); }
+.pill.critical{ background:var(--critical-soft); color:var(--critical); }
+.pill.warn{ background:var(--warn-soft); color:var(--warn); }
+
+.callout{ border-radius:10px; padding:10px 12px; font-size:.86rem; border:1px solid var(--border); }
+.callout.good{ background:var(--good-soft); color:var(--good); border-color:transparent; }
+.callout.critical{ background:var(--critical-soft); color:var(--critical); border-color:transparent; }
+.callout.info{ background:var(--accent-soft); color:var(--accent); border-color:transparent; }
+
+/* ===================== Atom canvas ===================== */
+.atom-stage{ position:relative; }
+.atom-stage canvas{ width:100%; display:block; border-radius:10px; background:var(--surface-sunken); border:1px solid var(--border); }
+.atom-toolbar{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.atom-toolbar button{
+  border:1px solid var(--border); background:var(--surface-sunken); color:var(--ink);
+  border-radius:8px; padding:6px 10px; font-size:.76rem; font-weight:600; cursor:pointer;
+}
+.atom-toolbar button[aria-pressed="true"]{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+
+.readout-row{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+.readout{ flex:1; min-width:90px; border-radius:10px; padding:8px 10px; border:1px solid var(--border); }
+.readout .label{ font-size:.64rem; text-transform:uppercase; letter-spacing:.07em; font-weight:700; opacity:.9; font-family:var(--font-mono); }
+.readout .value{ font-family:var(--font-mono); font-size:1.15rem; font-weight:600; }
+.readout.proton{ background:var(--c-proton-soft); color:var(--c-proton); }
+.readout.neutron{ background:var(--c-neutron-soft); color:var(--c-neutron); }
+.readout.electron{ background:var(--c-electron-soft); color:var(--c-electron); }
+
+/* ===================== Periodic table grid ===================== */
+.ptable-wrap{ overflow-x:auto; }
+.ptable{ display:grid; grid-template-columns: repeat(18, minmax(40px,1fr)); gap:3px; min-width:900px; }
+.ptable-cell{
+  border:1px solid var(--border); border-radius:5px; background:var(--surface-sunken); padding:3px 2px;
+  text-align:center; cursor:pointer; font-size:.62rem; line-height:1.15; color:var(--ink-muted);
+  display:flex; flex-direction:column; justify-content:center; min-height:46px;
+}
+.ptable-cell:hover{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+.ptable-cell.selected{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+.ptable-cell .z{ font-family:var(--font-mono); font-size:.58rem; opacity:.8; }
+.ptable-cell .sym{ font-weight:800; font-size:.92rem; font-family:var(--font-display); }
+.ptable-cell .mass{ font-family:var(--font-mono); font-size:.56rem; opacity:.75; }
+.ptable-spacer{ grid-column: span 1; }
+.ptable-footnote-label{ grid-column: 1 / span 3; display:flex; align-items:center; font-size:.68rem; color:var(--ink-faint); font-style:italic; }
+
+/* ===================== Data table ===================== */
+.data-table-wrap{ overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
+table.data-table{ width:100%; border-collapse:collapse; font-size:.82rem; min-width:360px; }
+table.data-table th, table.data-table td{ padding:7px 10px; text-align:left; border-bottom:1px solid var(--border); font-family:var(--font-mono); }
+table.data-table th{ font-family:var(--font-body); text-transform:uppercase; font-size:.66rem; letter-spacing:.05em; color:var(--ink-muted); background:var(--surface-sunken); }
+table.data-table tr:last-child td{ border-bottom:none; }
+
+.cer-field label{ font-size:.78rem; font-weight:700; display:block; margin-bottom:5px; }
+.cer-field textarea, .cer-field input{ width:100%; border:1px solid var(--border); border-radius:8px; padding:8px; resize:vertical; background:var(--surface-sunken); color:var(--ink); }
+
+footer.app-footer{ text-align:center; padding:28px 16px 40px; color:var(--ink-faint); font-size:.76rem; }
+
+.sr-only-focusable:not(:focus){ position:absolute; width:1px;height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+</style>
+</head>
+<body>
+
+<a class="btn sr-only-focusable" href="#mainContent">Skip to main content</a>
+
+<header class="app-header">
+  <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+    <circle cx="24" cy="24" r="4" fill="#F0564A"/>
+    <circle cx="24" cy="24" r="2.4" fill="#AEB7C4" transform="translate(4,-2)"/>
+    <ellipse cx="24" cy="24" rx="20" ry="8" fill="none" stroke="#3FA9F5" stroke-width="1.6" transform="rotate(0 24 24)"/>
+    <ellipse cx="24" cy="24" rx="20" ry="8" fill="none" stroke="#3FA9F5" stroke-width="1.6" transform="rotate(60 24 24)"/>
+    <ellipse cx="24" cy="24" rx="20" ry="8" fill="none" stroke="#3FA9F5" stroke-width="1.6" transform="rotate(120 24 24)"/>
+    <circle cx="44" cy="24" r="2" fill="#3FA9F5"/>
+  </svg>
+  <div class="header-text">
+    <h1>Atomic Explorer</h1>
+    <p class="subtitle">Grade 10 NYS Regents Chemistry &middot; Protons, neutrons, electrons &amp; the 2025 periodic table</p>
+  </div>
+  <div class="header-controls">
+    <button class="icon-btn no-print" id="textSizeDownBtn" type="button" aria-label="Decrease text size">A&minus;</button>
+    <button class="icon-btn no-print" id="textSizeUpBtn" type="button" aria-label="Increase text size">A+</button>
+    <button class="icon-btn no-print" id="themeToggleBtn" type="button" aria-pressed="false">&#9728; Light mode</button>
+  </div>
+</header>
+
+<nav class="tabs no-print" role="tablist" aria-label="Lesson sections" id="tabNav">
+  <button role="tab" data-tab="explore" aria-selected="true"><span class="tab-index">1</span>Explore the Atom</button>
+  <button role="tab" data-tab="ptable" aria-selected="false"><span class="tab-index">2</span>Periodic Table</button>
+  <button role="tab" data-tab="atomicnum" aria-selected="false"><span class="tab-index">3</span>Atomic Number</button>
+  <button role="tab" data-tab="massnum" aria-selected="false"><span class="tab-index">4</span>Mass Number</button>
+  <button role="tab" data-tab="build" aria-selected="false"><span class="tab-index">5</span>Build an Atom</button>
+  <button role="tab" data-tab="isotopes" aria-selected="false"><span class="tab-index">6</span>Isotopes</button>
+  <button role="tab" data-tab="practice" aria-selected="false"><span class="tab-index">7</span>Regents Practice</button>
+  <button role="tab" data-tab="mastery" aria-selected="false"><span class="tab-index">8</span>Mastery Challenge</button>
+</nav>
+
+<main id="mainContent">
+
+  <!-- ============ TAB 1: EXPLORE THE ATOM ============ -->
+  <section class="tab-panel active" id="tab-explore" data-tab="explore">
+    <div class="tab-intro">
+      <span class="standard-chip">Particle locations &amp; charges</span>
+      <h2>Explore the Atom</h2>
+      <p>Pick an element below, then click any particle in the diagram to learn what it is, where it lives, and what charge it carries.</p>
+    </div>
+    <div class="layout-grid">
+      <div>
+        <div class="panel atom-stage" id="explore-atom-panel"></div>
+      </div>
+      <div>
+        <div class="panel" id="explore-picker"></div>
+        <div class="panel" id="explore-particle-info">
+          <h3>Particle Inspector</h3>
+          <p id="explore-info-text">Click a proton, neutron, or electron in the diagram to learn about it.</p>
+        </div>
+        <div class="panel" id="explore-quiz"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 2: PERIODIC TABLE ============ -->
+  <section class="tab-panel" id="tab-ptable" data-tab="ptable">
+    <div class="tab-intro">
+      <span class="standard-chip">2025 NYSED Chemistry Reference Table</span>
+      <h2>Periodic Table</h2>
+      <p>Click any element to see its data and an atomic model. Average atomic mass (from the table) and mass number (for a specific isotope) are two different things — the panel below is explicit about which one it's showing.</p>
+    </div>
+    <div class="panel">
+      <div class="ptable-wrap"><div class="ptable" id="ptable-grid"></div></div>
+    </div>
+    <div class="panel" id="ptable-detail" style="margin-top:16px;">
+      <p>Select an element above to see its details.</p>
+    </div>
+  </section>
+
+  <!-- ============ TAB 3: ATOMIC NUMBER ============ -->
+  <section class="tab-panel" id="tab-atomicnum" data-tab="atomicnum">
+    <div class="tab-intro">
+      <span class="standard-chip">Identity of an element</span>
+      <h2>Atomic Number</h2>
+      <p>The atomic number identifies the element and equals the number of protons in its nucleus. For a neutral atom, the number of electrons equals the number of protons too.</p>
+    </div>
+    <div class="panel">
+      <div class="mono" style="font-size:1.1rem; text-align:center; padding:14px; background:var(--surface-sunken); border-radius:10px;">
+        Atomic Number = Number of Protons &nbsp;&middot;&nbsp; (neutral atom) Number of Electrons = Number of Protons
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px;">
+      <h3>Challenge: Guess the Element</h3>
+      <p id="guess-instructions">Count the protons shown in the nucleus, find that atomic number on the periodic table, then name the element.</p>
+      <div class="layout-grid">
+        <div class="atom-stage" id="guess-atom-panel"></div>
+        <div>
+          <div class="cer-field">
+            <label for="guess-input">Element name or symbol</label>
+            <input type="text" id="guess-input" placeholder="e.g., Carbon or C" autocomplete="off">
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="guess-submit">Submit guess</button>
+            <button class="btn" id="guess-hint">Hint</button>
+            <button class="btn" id="guess-next">Next element &rarr;</button>
+          </div>
+          <div id="guess-feedback" style="margin-top:10px;"></div>
+          <p class="mono" id="guess-progress" style="font-size:.78rem; color:var(--ink-faint); margin-top:10px;"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 4: MASS NUMBER ============ -->
+  <section class="tab-panel" id="tab-massnum" data-tab="massnum">
+    <div class="tab-intro">
+      <span class="standard-chip">Protons + neutrons</span>
+      <h2>Mass Number</h2>
+      <p>Mass number is the total count of protons and neutrons in the nucleus — not the periodic table's average atomic mass.</p>
+    </div>
+    <div class="panel">
+      <div class="mono" style="font-size:1.05rem; text-align:center; padding:14px; background:var(--surface-sunken); border-radius:10px; line-height:1.9;">
+        Mass Number = Protons + Neutrons<br>
+        Number of Neutrons = Mass Number &minus; Atomic Number
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px;">
+      <h3>Worked Example — Sodium-23</h3>
+      <p>Atomic number = 11 &middot; Mass number = 23 &middot; Protons = 11 &middot; Neutrons = 23 &minus; 11 = 12 &middot; Electrons = 11 (neutral atom)</p>
+      <div class="layout-grid">
+        <div class="atom-stage" id="na23-atom-panel"></div>
+        <div class="readout-row" style="align-content:flex-start;">
+          <div class="readout proton"><div class="label">Protons</div><div class="value">11</div></div>
+          <div class="readout neutron"><div class="label">Neutrons</div><div class="value">12</div></div>
+          <div class="readout electron"><div class="label">Electrons</div><div class="value">11</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px;">
+      <h3>Interactive Calculator</h3>
+      <p>Enter any two of the four fields; the program fills in the rest.</p>
+      <div class="layout-grid">
+        <div class="cer-field"><label for="calc-atomicnum">Atomic number (protons)</label><input type="number" id="calc-atomicnum" min="1" max="118"></div>
+        <div class="cer-field"><label for="calc-massnum">Mass number</label><input type="number" id="calc-massnum" min="1" max="300"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="calc-compute">Calculate</button>
+        <button class="btn" id="calc-clear">Clear</button>
+      </div>
+      <div id="calc-feedback" style="margin-top:10px;"></div>
+      <div class="readout-row" id="calc-readouts"></div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 5: BUILD AN ATOM ============ -->
+  <section class="tab-panel" id="tab-build" data-tab="build">
+    <div class="tab-intro">
+      <span class="standard-chip">Virtual atom-building lab</span>
+      <h2>Build an Atom</h2>
+      <p>Add or remove protons, neutrons, and electrons. The element identity, mass number, and charge all update automatically as you build.</p>
+    </div>
+    <div class="layout-grid">
+      <div class="panel atom-stage" id="build-atom-panel"></div>
+      <div>
+        <div class="panel" id="build-controls"></div>
+        <div class="panel" id="build-status"></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px;">
+      <h3>Challenges</h3>
+      <div class="stepper" id="build-level-switch" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;"></div>
+      <div id="build-challenge-text"></div>
+      <div id="build-challenge-feedback" style="margin-top:10px;"></div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 6: ISOTOPES ============ -->
+  <section class="tab-panel" id="tab-isotopes" data-tab="isotopes">
+    <div class="tab-intro">
+      <span class="standard-chip">Same element, different mass</span>
+      <h2>Isotopes</h2>
+      <p>Isotopes are atoms of the <strong>same element</strong> (same number of protons) with <strong>different numbers of neutrons</strong>. Compare three isotopes side by side.</p>
+    </div>
+    <div class="panel">
+      <label for="isotope-element-select" style="font-weight:700; font-size:.85rem;">Element family</label>
+      <select id="isotope-element-select" style="width:100%; max-width:360px; margin-top:6px; padding:9px; border:1px solid var(--border); border-radius:8px; background:var(--surface-sunken); color:var(--ink);"></select>
+      <label style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:.85rem;">
+        <input type="checkbox" id="isotope-notation-toggle"> Show nuclear symbol notation instead of names
+      </label>
+    </div>
+    <div id="isotope-cards" class="layout-grid" style="margin-top:16px; grid-template-columns:repeat(3,1fr);"></div>
+    <div class="panel" style="margin-top:16px;">
+      <h3>What Stays the Same? What Changes?</h3>
+      <div class="cer-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div class="cer-field"><label for="isotope-same">Stays the same across all three</label><textarea id="isotope-same" placeholder="e.g., number of protons, number of electrons, the element identity..."></textarea></div>
+        <div class="cer-field"><label for="isotope-diff">Changes across the three</label><textarea id="isotope-diff" placeholder="e.g., number of neutrons, mass number, total mass..."></textarea></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 7: REGENTS PRACTICE ============ -->
+  <section class="tab-panel" id="tab-practice" data-tab="practice">
+    <div class="tab-intro">
+      <span class="standard-chip">Original practice clusters</span>
+      <h2>Regents Practice</h2>
+      <p>Original questions modeled on Regents assessment practices — not reproductions of real exam items.</p>
+    </div>
+    <div class="panel" style="margin-bottom:16px; display:flex; gap:18px; align-items:center; flex-wrap:wrap;">
+      <div><span class="pill good" id="practice-score-pill">0 / 0 correct</span></div>
+      <div style="flex:1; min-width:160px; height:8px; background:var(--surface-sunken); border-radius:999px; overflow:hidden;">
+        <div id="practice-progress-bar" style="height:100%; width:0%; background:var(--accent); transition:width .3s;"></div>
+      </div>
+      <span class="mono" id="practice-progress-label" style="font-size:.78rem; color:var(--ink-muted);">0 of 0 attempted</span>
+    </div>
+    <div class="layout-grid">
+      <div class="panel question-list" id="practice-list"></div>
+      <div class="panel" id="practice-detail"><p>Select a question from the list to begin.</p></div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 8: MASTERY CHALLENGE ============ -->
+  <section class="tab-panel" id="tab-mastery" data-tab="mastery">
+    <div class="tab-intro">
+      <span class="standard-chip">15-question final assessment</span>
+      <h2>Mastery Challenge</h2>
+      <p>A focused, 15-question assessment covering every skill in this unit. You'll get a proficiency level and can retry any question you missed.</p>
+    </div>
+    <div class="panel" id="mastery-start">
+      <button class="btn primary" id="mastery-begin">Begin the Mastery Challenge</button>
+    </div>
+    <div id="mastery-run" style="display:none;"></div>
+    <div id="mastery-results" style="display:none;"></div>
+  </section>
+
+  <div id="tab-insertion-point"></div>
+</main>
+
+<footer class="app-footer">Atomic Explorer &middot; Element data transcribed from the NYSED 2025 Chemistry Reference Tables &middot; Runs entirely in your browser, no account required.</footer>
+
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
